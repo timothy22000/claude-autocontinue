@@ -1,6 +1,5 @@
 # Claude Auto-Continue
 
-> **Repository:** [github.com/timothy22000/claude-autocontinue](https://github.com/timothy22000/claude-autocontinue)
 
 A browser extension that automatically resumes Claude when it hits the per-turn tool-use limit. Works across all tabs and windows - active, background, and separate browser windows.
 
