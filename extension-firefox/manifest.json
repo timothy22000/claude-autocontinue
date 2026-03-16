@@ -1,0 +1,42 @@
+{
+  "manifest_version": 2,
+  "name": "Claude Auto-Continue",
+  "version": "1.2",
+  "description": "Automatically resumes Claude when it hits the tool-use limit. Clean, minimal, stays out of your way.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "claude-autocontinue@extension",
+      "strict_min_version": "109.0"
+    }
+  },
+
+  "permissions": [
+    "activeTab",
+    "storage",
+    "https://claude.ai/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16":  "icon16.png",
+      "48":  "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+
+  "icons": {
+    "16":  "icon16.png",
+    "48":  "icon48.png",
+    "128": "icon128.png"
+  }
+}

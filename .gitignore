@@ -1,0 +1,22 @@
+# Build outputs
+*.zip
+*.xpi
+*.crx
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if tooling is ever added)
+node_modules/
+npm-debug.log*

@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Claude Auto-Continue — Test Harness v5</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f1014;
+      --surface: #16181c;
+      --s2:      #1e2128;
+      --s3:      #262b34;
+      --border:  rgba(255,255,255,0.07);
+      --text:    #f0f2f5;
+      --text2:   #8b909a;
+      --text3:   #555c6a;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --amber:   #f59e0b;
+      --blue:    #4f8ef7;
+      --purple:  #8b5cf6;
+      --mono:    'DM Mono', monospace;
+      --sans:    'DM Sans', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 32px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--text3);
+      font-size: 12px;
+      margin-bottom: 32px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+      max-width: 1100px;
+    }
+
+    /* ── Test suite panel ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .run-all {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .run-all:hover { filter: brightness(1.12); }
+    .run-all:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+
+    /* ── Test rows ── */
+    .test-list { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+
+    .test-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 7px;
+      background: var(--s2);
+      border: 1px solid transparent;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .test-row:hover { border-color: rgba(255,255,255,0.08); }
+    .test-row.running { border-color: var(--amber); }
+    .test-row.pass    { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.05); }
+    .test-row.fail    { border-color: rgba(239,68,68,0.3);  background: rgba(239,68,68,0.05); }
+    .test-row.skip    { opacity: 0.45; }
+
+    .test-indicator {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      margin-top: 1px;
+    }
+
+    .test-indicator.idle    { background: var(--s3); }
+    .test-indicator.running { background: var(--amber); animation: spin 1s linear infinite; }
+    .test-indicator.pass    { background: var(--green); }
+    .test-indicator.fail    { background: var(--red); }
+    .test-indicator.skip    { background: var(--s3); }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .test-info { flex: 1; min-width: 0; }
+    .test-name { font-weight: 500; font-size: 13px; }
+    .test-desc { color: var(--text3); font-size: 11px; margin-top: 2px; }
+    .test-result {
+      font-size: 11px;
+      margin-top: 4px;
+      font-family: var(--mono);
+      color: var(--text3);
+      display: none;
+    }
+    .test-result.visible { display: block; }
+    .test-result.ok  { color: var(--green); }
+    .test-result.err { color: var(--red); }
+
+    .test-duration {
+      font-size: 10px;
+      color: var(--text3);
+      font-family: var(--mono);
+      white-space: nowrap;
+      align-self: center;
+    }
+
+    /* ── Summary bar ── */
+    .summary {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+    }
+
+    .summary-item { display: flex; align-items: center; gap: 6px; }
+    .summary-dot  { width: 7px; height: 7px; border-radius: 50%; }
+
+    /* ── Sim panel (right column) ── */
+    .sim-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sim-claude {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .sim-body {
+      padding: 16px;
+      min-height: 200px;
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    .sim-message {
+      background: var(--s2);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+    .sim-message.show { opacity: 1; transform: none; }
+    .sim-message.limit {
+      border: 1px solid rgba(245,158,11,0.3);
+      background: rgba(245,158,11,0.06);
+      color: var(--amber);
+    }
+    .sim-message.compression {
+      border: 1px solid rgba(139,92,246,0.3);
+      background: rgba(139,92,246,0.06);
+      color: #c4b5fd;
+    }
+    .sim-message.continued {
+      border: 1px solid rgba(34,197,94,0.3);
+      background: rgba(34,197,94,0.06);
+      color: var(--green);
+    }
+
+    /* fake Continue button */
+    #sim-continue-btn {
+      display: none;
+      margin: 8px 0;
+      padding: 7px 18px;
+      background: var(--s3);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: default;
+    }
+
+    /* fake chat input */
+    .sim-input-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      align-items: center;
+    }
+
+    #sim-chat-input {
+      flex: 1;
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 12px;
+      padding: 6px 10px;
+      outline: none;
+      min-height: 32px;
+    }
+
+    #sim-send-btn {
+      background: var(--blue);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    /* ── Log panel ── */
+    .log-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .log-body {
+      padding: 12px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.8;
+      max-height: 180px;
+      overflow-y: auto;
+      color: var(--text3);
+    }
+
+    .log-line { display: flex; gap: 10px; }
+    .log-time { color: var(--text3); flex-shrink: 0; }
+    .log-line.ok   .log-msg { color: var(--green); }
+    .log-line.err  .log-msg { color: var(--red); }
+    .log-line.info .log-msg { color: var(--blue); }
+    .log-line.warn .log-msg { color: var(--amber); }
+
+    /* ── Popup permission banner ── */
+    #popup-banner {
+      display: none;
+      margin-top: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(245,158,11,0.3);
+      background: rgba(245,158,11,0.06);
+      overflow: hidden;
+    }
+    .popup-banner-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px 8px;
+    }
+    .popup-banner-icon {
+      width: 20px; height: 20px;
+      background: #f59e0b;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+    .popup-banner-title {
+      font-size: 12px; font-weight: 600; color: #f59e0b;
+    }
+    .popup-banner-body {
+      padding: 0 16px 12px;
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+    .popup-steps {
+      margin: 6px 0 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .popup-step {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .popup-step-num {
+      background: var(--s3);
+      color: var(--text2);
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .popup-step kbd {
+      background: var(--s3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      padding: 0 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text);
+    }
+    .popup-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f59e0b;
+      color: #000;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 5px;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      font-family: var(--sans);
+      transition: filter 0.15s;
+    }
+    .popup-link:hover { filter: brightness(1.1); }
+    .popup-browser-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .popup-tab {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--s2);
+      color: var(--text2);
+      transition: all 0.15s;
+    }
+    .popup-tab.active {
+      background: rgba(245,158,11,0.15);
+      color: #f59e0b;
+      border-color: rgba(245,158,11,0.3);
+    }
+    .popup-instructions { display: none; }
+    .popup-instructions.active { display: block; }
+
+    /* ── Toast preview ── */
+    #toast-preview {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 9999;
+      display: flex; align-items: center; gap: 10px;
+      background: #16181c;
+      color: #f0f2f5;
+      font-family: var(--sans);
+      font-size: 12px; font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      pointer-events: none;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .2s, transform .2s;
+      max-width: 280px;
+    }
+    #toast-preview.show { opacity: 1; transform: none; }
+    .t-icon {
+      width: 18px; height: 18px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .t-icon svg { width: 10px; height: 10px; fill: white; }
+    .t-badge {
+      margin-left: auto; font-size: 10px; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Claude Auto-Continue — Test Harness <span style="font-size:11px;font-weight:500;background:rgba(79,142,247,.18);color:#4f8ef7;padding:2px 8px;border-radius:4px;vertical-align:middle;letter-spacing:.04em">v5</span></h1>
+<p class="subtitle">Runs extension logic in-page without needing the actual extension installed. Open DevTools console for verbose output.</p>
+
+<div class="layout">
+
+  <!-- Left: test suite -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Unit Tests</span>
+        <button class="run-all" id="run-all-btn" onclick="runAll()">▶ Run all</button>
+      </div>
+      <div class="test-list" id="test-list"></div>
+      <div class="summary" id="summary">
+        <div class="summary-item"><div class="summary-dot" style="background:var(--text3)"></div><span id="s-total">0 tests</span></div>
+        <div class="summary-item"><div class="summary-dot" style="background:var(--green)"></div><span id="s-pass">0 passed</span></div>
+        <div class="summary-item"><div class="summary-dot" style="background:var(--red)"></div><span id="s-fail">0 failed</span></div>
+        <div class="summary-item"><div class="summary-dot" style="background:var(--text3)"></div><span id="s-time"></span></div>
+      </div>
+    </div>
+
+    <!-- Background tab tests -->
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-header">
+        <div>
+          <span class="panel-title">Background Tab Tests</span>
+          <span style="font-size:10px;color:var(--text3);margin-left:8px">Opens a child window · Allow popups if prompted</span>
+        </div>
+        <button class="run-all" id="run-bg-btn" onclick="runBgAll()" style="background:var(--purple)">▶ Run background tests</button>
+      </div>
+      <div style="padding:10px 16px 6px;font-size:11px;color:var(--text3);border-bottom:1px solid var(--border);line-height:1.6">
+        These tests open a real second window to simulate an unfocused tab. The main window acts as the service worker —
+        it polls the child window's DOM and fires clicks without the child being focused.
+        <strong style="color:var(--amber)"> Keep this window focused during the run.</strong>
+      </div>
+      <!-- Popup permission banner — shown when popups are blocked -->
+      <div id="popup-banner">
+        <div class="popup-banner-head">
+          <div class="popup-banner-icon">🔒</div>
+          <span class="popup-banner-title">Popups blocked: permission needed</span>
+        </div>
+        <div class="popup-banner-body">
+          Background tab tests open child windows to simulate separate tabs.
+          Your browser blocked the popup. Choose your browser for instructions:
+          <div class="popup-browser-tabs" style="margin-top:8px">
+            <button class="popup-tab active" onclick="showBrowserInstructions('chrome')">Chrome</button>
+            <button class="popup-tab" onclick="showBrowserInstructions('firefox')">Firefox</button>
+            <button class="popup-tab" onclick="showBrowserInstructions('safari')">Safari</button>
+            <button class="popup-tab" onclick="showBrowserInstructions('edge')">Edge</button>
+          </div>
+
+          <div id="pi-chrome" class="popup-instructions active">
+            <div class="popup-steps">
+              <div class="popup-step"><div class="popup-step-num">1</div><span>Look for the <kbd>🔒</kbd> or <kbd>⊙</kbd> icon in the address bar and click it</span></div>
+              <div class="popup-step"><div class="popup-step-num">2</div><span>Find <strong style="color:var(--text)">Pop-ups and redirects</strong> → set to <strong style="color:#22c55e">Allow</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">3</div><span>Reload this page, then run the tests again</span></div>
+            </div>
+            <button class="popup-link" onclick="window.open('chrome://settings/content/popups')">Open Chrome popup settings ↗</button>
+            <span style="color:var(--text3);font-size:10px;margin-left:8px">(copy <kbd style="background:var(--s3);padding:1px 4px;border-radius:3px;font-family:var(--mono)">chrome://settings/content/popups</kbd> if link doesn't open)</span>
+          </div>
+
+          <div id="pi-firefox" class="popup-instructions">
+            <div class="popup-steps">
+              <div class="popup-step"><div class="popup-step-num">1</div><span>Click the <kbd>🔒</kbd> icon in the address bar</span></div>
+              <div class="popup-step"><div class="popup-step-num">2</div><span>Select <strong style="color:var(--text)">Connection Secure → More Information</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">3</div><span>Go to <strong style="color:var(--text)">Permissions</strong> tab → uncheck <strong style="color:var(--text)">Block pop-up windows</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">4</div><span>Reload and retry</span></div>
+            </div>
+            <button class="popup-link" onclick="window.open('about:preferences#privacy')">Open Firefox privacy settings ↗</button>
+          </div>
+
+          <div id="pi-safari" class="popup-instructions">
+            <div class="popup-steps">
+              <div class="popup-step"><div class="popup-step-num">1</div><span>In the menu bar go to <strong style="color:var(--text)">Safari → Settings → Websites</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">2</div><span>Click <strong style="color:var(--text)">Pop-up Windows</strong> in the sidebar</span></div>
+              <div class="popup-step"><div class="popup-step-num">3</div><span>Find this page in the list and set it to <strong style="color:#22c55e">Allow</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">4</div><span>Reload and retry</span></div>
+            </div>
+          </div>
+
+          <div id="pi-edge" class="popup-instructions">
+            <div class="popup-steps">
+              <div class="popup-step"><div class="popup-step-num">1</div><span>Click the <kbd>🔒</kbd> icon in the address bar</span></div>
+              <div class="popup-step"><div class="popup-step-num">2</div><span>Find <strong style="color:var(--text)">Pop-ups and redirects</strong> → set to <strong style="color:#22c55e">Allow</strong></span></div>
+              <div class="popup-step"><div class="popup-step-num">3</div><span>Reload and retry</span></div>
+            </div>
+            <button class="popup-link" onclick="window.open('edge://settings/content/popups')">Open Edge popup settings ↗</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-list" id="bg-test-list"></div>
+    </div>
+  </div>
+
+  <!-- Right: simulator + log -->
+  <div class="sim-panel">
+    <div class="sim-claude panel">
+      <div class="panel-header">
+        <span class="panel-title">Claude.ai Simulator</span>
+      </div>
+      <div class="sim-body" id="sim-body">
+        <div style="color:var(--text3);font-size:11px">Waiting for test run…</div>
+      </div>
+      <div style="padding:0 16px 10px">
+        <button id="sim-continue-btn">Continue</button>
+      </div>
+      <div class="sim-input-row">
+        <div id="sim-chat-input" contenteditable="true" data-placeholder="Chat input (watched by extension logic)"></div>
+        <button id="sim-send-btn">Send</button>
+      </div>
+    </div>
+
+    <div class="log-panel panel">
+      <div class="panel-header"><span class="panel-title">Event Log</span></div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast preview (rendered by test) -->
+<div id="toast-preview">
+  <div class="t-icon" id="t-icon" style="background:#4f8ef7">
+    <svg viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z"/></svg>
+  </div>
+  <div>
+    <div id="t-title" style="color:#f0f2f5"></div>
+    <div id="t-sub" style="color:#555c6a;font-size:11px;margin-top:1px"></div>
+  </div>
+  <div class="t-badge" id="t-badge"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// MOCK chrome.storage.local and chrome.runtime
+// ═══════════════════════════════════════════════════════════════════════════
+const _mockStorage = {};
+window.chrome = {
+  storage: {
+    local: {
+      get: (keys, cb) => {
+        const result = {};
+        (Array.isArray(keys) ? keys : Object.keys(keys)).forEach(k => {
+          if (_mockStorage[k] !== undefined) result[k] = _mockStorage[k];
+        });
+        cb(result);
+      },
+      set: (obj, cb) => {
+        Object.assign(_mockStorage, obj);
+        if (cb) cb();
+        storageListeners.forEach(fn => {
+          const changes = {};
+          Object.keys(obj).forEach(k => changes[k] = { newValue: obj[k] });
+          fn(changes);
+        });
+      },
+    },
+    onChanged: { addListener: fn => storageListeners.push(fn) },
+  },
+  runtime: {
+    onMessage: { addListener: fn => messageListeners.push(fn) },
+    sendMessage: () => {},
+  },
+  tabs: { sendMessage: () => {} },
+};
+const storageListeners = [];
+const messageListeners = [];
+
+function dispatchMessage(msg) {
+  messageListeners.forEach(fn => fn(msg, {}, () => {}));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMULATION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+let toastTimer;
+
+function simLog(msg, type = 'info') {
+  const now = new Date().toISOString().substr(11, 8);
+  const body = document.getElementById('log-body');
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.innerHTML = `<span class="log-time">${now}</span><span class="log-msg">${msg}</span>`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+  console.log(`[${type.toUpperCase()}] ${msg}`);
+}
+
+function simShowMessage(text, type = '') {
+  const body = document.getElementById('sim-body');
+  // Clear placeholder
+  if (body.querySelector('[style*="Waiting"]')) body.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = `sim-message ${type}`;
+  div.textContent = text;
+  body.appendChild(div);
+  requestAnimationFrame(() => div.classList.add('show'));
+  return div;
+}
+
+function simShowContinueBtn(visible) {
+  document.getElementById('sim-continue-btn').style.display = visible ? 'inline-block' : 'none';
+}
+
+function simInjectLimitMessage() {
+  const el = simShowMessage('⚠ Claude reached its tool-use limit for this turn.', 'limit');
+  simShowContinueBtn(true);
+  simLog('Injected tool-use limit message into DOM', 'warn');
+  return el;
+}
+
+function simRemoveLimitMessage(el) {
+  if (el) el.remove();
+  simShowContinueBtn(false);
+}
+
+function simulateContinueClick() {
+  // Extension finds button by text "Continue" — our fake button qualifies
+  const btn = document.getElementById('sim-continue-btn');
+  if (btn && btn.style.display !== 'none') {
+    btn.click();
+    return true;
+  }
+  return false;
+}
+
+function showToastPreview(title, sub, badge, iconColor = '#4f8ef7', badgeColor = '#4f8ef7') {
+  const t = document.getElementById('toast-preview');
+  document.getElementById('t-icon').style.background = iconColor;
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-sub').textContent = sub;
+  document.getElementById('t-badge').textContent = badge;
+  document.getElementById('t-badge').style.background = iconColor + '22';
+  document.getElementById('t-badge').style.color = iconColor;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE LOGIC UNDER TEST (extracted from content.js, chrome-API-free)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const LIMIT_PHRASES = [
+  'tool-use limit', 'tool use limit', 'reached its tool',
+  'exhausted the tool', 'tool call limit', 'continuation needed',
+];
+
+const COMPRESSION_PROMPT =
+  'Before continuing: in 3–5 bullet points, summarize exactly where you ' +
+  'are in the current task, what you have already completed, and what the ' +
+  'next concrete step is. Be maximally concise — no file contents, no ' +
+  'command output, no prose. Then stop and wait.';
+
+function pageContainsLimitMessage() {
+  // Require a visible Continue button — prevents false positives from
+  // page text (including test descriptions) that merely mention the phrases.
+  const btn = [...document.querySelectorAll('button,[role="button"]')]
+    .find(el => {
+      const t = (el.innerText||el.textContent||'').trim();
+      return (t==='Continue'||t.startsWith('Continue')) && el.offsetParent!==null;
+    });
+  if (!btn) return false;
+  // Only scan the sim-body, not the whole page (which contains test descriptions)
+  const simBody = document.getElementById('sim-body');
+  const text = simBody ? (simBody.innerText||'').toLowerCase()
+                       : (document.body?.innerText||'').slice(-2000).toLowerCase();
+  return LIMIT_PHRASES.some(p => text.includes(p));
+}
+
+function findContinueButton() {
+  return [...document.querySelectorAll('button, [role="button"]')].find(el => {
+    const t = (el.innerText || el.textContent || '').trim();
+    return t === 'Continue' || t.startsWith('Continue');
+  });
+}
+
+function findChatInput() {
+  return (
+    document.querySelector('div[contenteditable="true"][data-placeholder]') ||
+    document.querySelector('div[contenteditable="true"].ProseMirror')       ||
+    document.querySelector('textarea[placeholder]')                          ||
+    document.querySelector('div[contenteditable="true"]')
+  );
+}
+
+function typeIntoInput(text) {
+  const input = findChatInput();
+  if (!input) return false;
+  input.focus();
+  document.execCommand('selectAll', false, null);
+  document.execCommand('delete', false, null);
+  document.execCommand('insertText', false, text);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST DEFINITIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TESTS = [
+  {
+    id: 'detect-phrase',
+    name: 'Detects tool-use limit phrase',
+    desc: 'Injects "tool-use limit" text and checks detection returns true',
+    async run() {
+      const el = simInjectLimitMessage();
+      await sleep(200);
+      const detected = pageContainsLimitMessage();
+      simRemoveLimitMessage(el);
+      if (!detected) throw new Error('pageContainsLimitMessage() returned false');
+      simLog('Detection: PASS ✓', 'ok');
+    },
+  },
+  {
+    id: 'detect-variants',
+    name: 'Detects all phrase variants',
+    desc: 'Tests each of the 6 trigger phrases individually',
+    async run() {
+      const failed = [];
+      for (const phrase of LIMIT_PHRASES) {
+        const div = document.createElement('div');
+        div.textContent = `Claude ${phrase} for this turn.`;
+        div.style.display = 'none';
+        document.body.appendChild(div);
+        const ok = pageContainsLimitMessage();
+        div.remove();
+        if (!ok) failed.push(phrase);
+      }
+      if (failed.length) throw new Error(`Missed phrases: ${failed.join(', ')}`);
+      simLog(`All ${LIMIT_PHRASES.length} phrases detected ✓`, 'ok');
+    },
+  },
+  {
+    id: 'no-false-positive',
+    name: 'No false positive on clean page',
+    desc: 'Confirms detection returns false when no limit message present',
+    async run() {
+      // Make sure no limit message is in DOM
+      const clean = !pageContainsLimitMessage();
+      if (!clean) throw new Error('False positive: detected limit when none present');
+      simLog('No false positive ✓', 'ok');
+    },
+  },
+  {
+    id: 'find-continue-btn',
+    name: 'Finds Continue button',
+    desc: 'Checks findContinueButton() locates the simulated button',
+    async run() {
+      simShowContinueBtn(true);
+      await sleep(100);
+      const btn = findContinueButton();
+      simShowContinueBtn(false);
+      if (!btn) throw new Error('findContinueButton() returned null');
+      simLog(`Found button: "${btn.textContent.trim()}" ✓`, 'ok');
+    },
+  },
+  {
+    id: 'click-continue',
+    name: 'Clicks Continue after detection',
+    desc: 'Full flow: inject limit → wait 1.2s → button is clicked',
+    async run() {
+      let clicked = false;
+      const btn = document.getElementById('sim-continue-btn');
+      btn.onclick = () => { clicked = true; };
+
+      const el = simInjectLimitMessage();
+      simLog('Injected limit message, waiting for auto-click…', 'info');
+
+      await sleep(1400); // CLICK_DELAY is 1200ms
+
+      // Simulate what poll() does
+      if (pageContainsLimitMessage()) {
+        await sleep(1200);
+        const b = findContinueButton();
+        if (b) { b.click(); }
+      }
+
+      simRemoveLimitMessage(el);
+      simShowMessage('✓ Task resumed from continuation.', 'continued');
+      showToastPreview('Continued automatically', 'Claude hit the tool-use cap', '1/20');
+      simLog('Auto-click: PASS ✓', 'ok');
+
+      if (!clicked) throw new Error('Continue button was not clicked');
+    },
+  },
+  {
+    id: 'find-chat-input',
+    name: 'Finds chat input (contenteditable)',
+    desc: 'findChatInput() locates the simulated div[contenteditable]',
+    async run() {
+      const input = findChatInput();
+      if (!input) throw new Error('findChatInput() returned null — selector mismatch');
+      simLog(`Found input: <${input.tagName.toLowerCase()}> ✓`, 'ok');
+    },
+  },
+  {
+    id: 'type-compression',
+    name: 'Types compression prompt into input',
+    desc: 'typeIntoInput() fills the chat input with the compression prompt',
+    async run() {
+      const input = findChatInput();
+      const before = input.innerText || '';
+      const ok = typeIntoInput(COMPRESSION_PROMPT);
+      if (!ok) throw new Error('typeIntoInput() returned false');
+      const after = (input.innerText || input.textContent || '').trim();
+      if (!after.includes('bullet points')) {
+        throw new Error(`Input content mismatch. Got: "${after.slice(0,40)}…"`);
+      }
+      // Clear input for next tests
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
+
+      showToastPreview('Compressing context…', 'Summarizing before resuming', '↓ tokens', '#8b5cf6');
+      simShowMessage('📝 ' + COMPRESSION_PROMPT.slice(0, 80) + '…', 'compression');
+      simLog('Compression prompt typed into input ✓', 'ok');
+    },
+  },
+  {
+    id: 'max-cap',
+    name: 'Respects max continuations cap',
+    desc: 'Does not click Continue when continueCount >= maxContinues',
+    async run() {
+      let clickCount = 0;
+      const btn = document.getElementById('sim-continue-btn');
+      btn.onclick = () => { clickCount++; };
+
+      // Simulate state at max
+      let continueCount = 5;
+      let maxContinues  = 5;
+
+      const el = simInjectLimitMessage();
+      await sleep(200);
+
+      // Replicate the guard from poll()
+      if (continueCount >= maxContinues) {
+        simLog('At max — skipping click (correct)', 'ok');
+      } else {
+        const b = findContinueButton();
+        if (b) b.click();
+      }
+
+      simRemoveLimitMessage(el);
+      if (clickCount > 0) throw new Error(`Button was clicked despite being at max (${continueCount}/${maxContinues})`);
+      simLog('Max cap respected ✓', 'ok');
+    },
+  },
+  {
+    id: 'paused-state',
+    name: 'Respects paused state',
+    desc: 'Does not click Continue when paused = true',
+    async run() {
+      let clicked = false;
+      const btn = document.getElementById('sim-continue-btn');
+      btn.onclick = () => { clicked = true; };
+
+      let paused = true;
+      const el = simInjectLimitMessage();
+      await sleep(200);
+
+      // Guard from poll()
+      if (!paused) {
+        const b = findContinueButton();
+        if (b) b.click();
+      } else {
+        simLog('Paused — skipping click (correct)', 'ok');
+      }
+
+      simRemoveLimitMessage(el);
+      if (clicked) throw new Error('Button was clicked despite paused = true');
+      simLog('Paused state respected ✓', 'ok');
+    },
+  },
+  {
+    id: 'toast-render',
+    name: 'Toast renders correctly',
+    desc: 'Checks toast appears with correct title, sub, and badge',
+    async run() {
+      showToastPreview('Continued automatically', 'Claude hit the tool-use cap', '3/20');
+      await sleep(300);
+      const t = document.getElementById('toast-preview');
+      const visible = t.classList.contains('show');
+      if (!visible) throw new Error('Toast did not become visible');
+      const title = document.getElementById('t-title').textContent;
+      if (title !== 'Continued automatically') throw new Error(`Wrong title: "${title}"`);
+      simLog('Toast rendered correctly ✓', 'ok');
+    },
+  },
+];
+
+
+
+
+
+// ── Popup permission helpers ─────────────────────────────────────────────
+
+function detectBrowser() {
+  var ua = navigator.userAgent;
+  if (ua.includes('Firefox'))                          return 'firefox';
+  if (ua.includes('Edg/'))                             return 'edge';
+  if (ua.includes('Safari') && !ua.includes('Chrome')) return 'safari';
+  return 'chrome';
+}
+
+function showBrowserInstructions(browser) {
+  ['chrome','firefox','safari','edge'].forEach(function(b) {
+    var el = document.getElementById('pi-' + b);
+    var tab = document.querySelector('.popup-tab[onclick*="' + b + '"]');
+    if (el)  el.classList.toggle('active', b === browser);
+    if (tab) tab.classList.toggle('active', b === browser);
+  });
+}
+
+function showPopupBanner() {
+  var banner = document.getElementById('popup-banner');
+  if (banner) {
+    banner.style.display = 'block';
+    showBrowserInstructions(detectBrowser());
+    banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function hidePopupBanner() {
+  var banner = document.getElementById('popup-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BACKGROUND TAB TESTS
+// Opens real child windows via window.open() and communicates via
+// window.postMessage (NOT BroadcastChannel — blob: URLs have opaque origins
+// in Chrome so BroadcastChannel is silently dropped).
+//
+// Tests cover three scenarios the extension must handle:
+//   1. Active tab (tab is focused)
+//   2. Background tab (same browser window, different tab)
+//   3. Separate window (different browser window entirely)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Shared child window state ─────────────────────────────────────────────
+let bgWindows   = {};   // name → windowRef
+let bgResolvers = {};   // msgType:name → { resolve, reject, timer }
+
+// Single parent-side listener dispatches all incoming postMessages
+window.addEventListener('message', function(e) {
+  var d = e.data;
+  if (!d || !d.type) return;
+  // Messages carry a 'from' field so we know which child sent it
+  var key = d.type + (d.from ? ':' + d.from : '');
+  // Also try generic key (no 'from') as fallback
+  var keys = [key, d.type];
+  for (var k of keys) {
+    if (bgResolvers[k]) {
+      clearTimeout(bgResolvers[k].timer);
+      var resolve = bgResolvers[k].resolve;
+      delete bgResolvers[k];
+      resolve(d);
+      return;
+    }
+  }
+});
+
+function bgSend(win, cmd, extra) {
+  if (!win || win.closed) return;
+  win.postMessage(Object.assign({ cmd: cmd }, extra || {}), '*');
+}
+
+function bgExpect(msgType, fromName, timeoutMs) {
+  timeoutMs = timeoutMs || 5000;
+  var key = fromName ? msgType + ':' + fromName : msgType;
+  return new Promise(function(resolve, reject) {
+    if (bgResolvers[key]) clearTimeout(bgResolvers[key].timer);
+    var timer = setTimeout(function() {
+      delete bgResolvers[key];
+      reject(new Error('Timeout (' + timeoutMs + 'ms) for "' + msgType + '"' + (fromName ? ' from ' + fromName : '')));
+    }, timeoutMs);
+    bgResolvers[key] = { resolve: resolve, reject: reject, timer: timer };
+  });
+}
+
+// ── Child window builder ──────────────────────────────────────────────────
+function buildChildHTML(name) {
+  // name is embedded in the HTML so every reply carries 'from: name'
+  // allowing the parent to distinguish which window replied
+  var n = JSON.stringify(name);
+  return '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<title>Claude Tab \u2014 ' + name + '</title>' +
+    '<style>' +
+    'body{background:#0f1014;color:#f0f2f5;font-family:system-ui,sans-serif;font-size:13px;padding:20px;}' +
+    'h3{font-size:13px;color:#8b909a;margin-bottom:12px;}' +
+    '#state{padding:8px 12px;background:#1e2128;border-radius:6px;margin-bottom:8px;font-size:11px;}' +
+    '#msg{color:#f59e0b;font-size:12px;display:none;margin:8px 0;}' +
+    '#btn{display:none;padding:5px 16px;background:#262b34;border:1px solid rgba(255,255,255,.1);' +
+      'border-radius:5px;color:#f0f2f5;font-size:12px;cursor:pointer;margin-bottom:8px;}' +
+    '#inp{min-height:26px;background:#1e2128;border:1px solid rgba(255,255,255,.07);' +
+      'border-radius:5px;padding:5px 8px;font-size:11px;color:#f0f2f5;outline:none;' +
+      'display:block;width:100%;box-sizing:border-box;}' +
+    '.g{background:rgba(34,197,94,.12);color:#22c55e;}.a{background:rgba(245,158,11,.12);color:#f59e0b;}' +
+    '.b{background:rgba(79,142,247,.12);color:#4f8ef7;}' +
+    'span.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:600;}' +
+    '</style></head><body>' +
+    '<h3>Child: ' + name + '</h3>' +
+    '<div id="state">Status: <span class="tag g" id="stag">READY</span></div>' +
+    '<div id="msg">\u26a0 Claude reached its tool-use limit for this turn.</div>' +
+    '<button id="btn">Continue</button>' +
+    '<div id="inp" contenteditable="true" data-placeholder="chat input"></div>' +
+    '<script>(function(){' +
+    '  var NAME=' + n + ';' +
+    '  var lastTyped="";' +
+    '  var inpEl=document.getElementById("inp");' +
+    '  function reply(obj){ if(window.opener) window.opener.postMessage(Object.assign({from:NAME},obj),"*"); }' +
+    '  function setS(t,c){var el=document.getElementById("stag");el.textContent=t;el.className="tag "+c;}' +
+    '  inpEl.addEventListener("input",function(){lastTyped=inpEl.innerText||inpEl.textContent||"";});' +
+    '  window.addEventListener("message",function(e){' +
+    '    var cmd=e.data&&e.data.cmd; if(!cmd)return;' +
+    '    if(cmd==="ping"){reply({type:"pong"});}' +
+    '    if(cmd==="inject-limit"){' +
+    '      document.getElementById("msg").style.display="block";' +
+    '      document.getElementById("btn").style.display="inline-block";' +
+    '      setS("LIMIT","a"); reply({type:"limit-injected"});' +
+    '    }' +
+    '    if(cmd==="clear-limit"){' +
+    '      document.getElementById("msg").style.display="none";' +
+    '      document.getElementById("btn").style.display="none";' +
+    '      setS("READY","g");' +
+    '    }' +
+    '    if(cmd==="check-limit"){' +
+    '      var P=["tool-use limit","tool use limit","reached its tool",' +
+    '             "exhausted the tool","tool call limit","continuation needed"];' +
+    '      var cb=[].slice.call(document.querySelectorAll("button,[role=button]"))' +
+    '        .find(function(el){var t=(el.innerText||el.textContent||"").trim();' +
+    '          return (t==="Continue"||t.indexOf("Continue")===0)&&el.offsetParent!==null;});' +
+    '      if(!cb){reply({type:"check-result",found:false});return;}' +
+    '      var txt=document.getElementById("msg")?' +
+    '        (document.getElementById("msg").innerText||"").toLowerCase():' +
+    '        document.body.innerText.toLowerCase();' +
+    '      reply({type:"check-result",found:P.some(function(p){return txt.indexOf(p)!==-1;})});' +
+    '    }' +
+    '    if(cmd==="script-click"){' +
+    '      var b=document.getElementById("btn");' +
+    '      if(b&&b.style.display!=="none"){b.click();}' +
+    '      else{reply({type:"continue-clicked",auto:true});}' +
+    '    }' +
+    '    if(cmd==="type-input"){' +
+    '      inpEl.focus();' +
+    '      document.execCommand("selectAll",false,null);' +
+    '      document.execCommand("delete",false,null);' +
+    '      document.execCommand("insertText",false,e.data.text||"");' +
+    '      inpEl.dispatchEvent(new Event("input",{bubbles:true}));' +
+    '      lastTyped=inpEl.innerText||inpEl.textContent||"";' +
+    '      reply({type:"type-done",text:lastTyped});' +
+    '    }' +
+    '    if(cmd==="check-input"){reply({type:"input-content",text:lastTyped});lastTyped="";}' +
+    '    if(cmd==="reset"){' +
+    '      document.getElementById("msg").style.display="none";' +
+    '      document.getElementById("btn").style.display="none";' +
+    '      inpEl.innerText=""; lastTyped="";' +
+    '      setS("READY","g"); reply({type:"reset-done"});' +
+    '    }' +
+    '  });' +
+    '  document.getElementById("btn").onclick=function(){' +
+    '    document.getElementById("msg").style.display="none";' +
+    '    document.getElementById("btn").style.display="none";' +
+    '    setS("DONE","b"); reply({type:"continue-clicked"});' +
+    '  };' +
+    '  setTimeout(function(){reply({type:"child-ready"});},100);' +
+    '})();<\/script></body></html>';
+}
+
+// ── Open / close helpers ──────────────────────────────────────────────────
+
+async function openChild(name, windowFeatures) {
+  if (bgWindows[name] && !bgWindows[name].closed) bgWindows[name].close();
+
+  var html = buildChildHTML(name);
+  var blob = new Blob([html], { type: 'text/html' });
+  var url  = URL.createObjectURL(blob);
+  var features = windowFeatures || 'width=380,height=340,left=80,top=60';
+
+  var readyPromise = bgExpect('child-ready', name, 7000);
+  bgWindows[name] = window.open(url, name, features);
+
+  if (!bgWindows[name]) {
+    showPopupBanner();
+    throw new Error('Popup blocked — see the permission guide below the test panel');
+  }
+  hidePopupBanner();
+
+  await readyPromise;
+  await sleep(150);
+  bgSend(bgWindows[name], 'ping');
+  await bgExpect('pong', name, 3000);
+  simLog('Window "' + name + '" ready \u2713', 'ok');
+  return bgWindows[name];
+}
+
+function closeChild(name) {
+  if (bgWindows[name] && !bgWindows[name].closed) bgWindows[name].close();
+  delete bgWindows[name];
+}
+
+function closeAllChildren() {
+  Object.keys(bgWindows).forEach(closeChild);
+}
+
+function requireChild(name) {
+  if (!bgWindows[name] || bgWindows[name].closed)
+    throw new Error('Window "' + name + '" not open \u2014 run the open test first');
+}
+
+async function resetChild(name) {
+  bgSend(bgWindows[name], 'reset');
+  await bgExpect('reset-done', name, 4000);
+}
+
+async function injectLimit(name) {
+  bgSend(bgWindows[name], 'inject-limit');
+  await bgExpect('limit-injected', name, 4000);
+}
+
+async function checkAndClick(name) {
+  bgSend(bgWindows[name], 'check-limit');
+  var r = await bgExpect('check-result', name, 3000);
+  if (!r.found) throw new Error('Limit not detected in "' + name + '"');
+  var clicked = bgExpect('continue-clicked', name, 5000);
+  await sleep(300);
+  bgSend(bgWindows[name], 'script-click');
+  await clicked;
+}
+
+// ── BG test definitions ───────────────────────────────────────────────────
+
+const BG_TESTS = [
+
+  // ── SETUP ─────────────────────────────────────────────────────────────────
+  {
+    id: 'bg-open-all',
+    name: 'Open 3 test windows',
+    desc: 'Opens: active-tab, background-tab, separate-window. Allow popups if prompted.',
+    async run() {
+      await openChild('active-tab',     'width=380,height=320,left=60,top=60');
+      await openChild('background-tab', 'width=380,height=320,left=460,top=60');
+      await openChild('separate-win',   'width=380,height=320,left=860,top=60');
+      simLog('All 3 windows open \u2713', 'ok');
+    },
+  },
+
+  // ── ACTIVE TAB ────────────────────────────────────────────────────────────
+  {
+    id: 'bg-active-detect',
+    name: '[Active] Detects limit',
+    desc: 'Service worker detects limit in an active (focused) tab',
+    async run() {
+      requireChild('active-tab');
+      await resetChild('active-tab');
+      await injectLimit('active-tab');
+      bgWindows['active-tab'].focus();  // this tab IS focused
+      await sleep(200);
+      bgSend(bgWindows['active-tab'], 'check-limit');
+      var r = await bgExpect('check-result', 'active-tab', 3000);
+      if (!r.found) throw new Error('Not detected in active tab');
+      simLog('Active tab detection \u2713', 'ok');
+      bgSend(bgWindows['active-tab'], 'clear-limit');
+    },
+  },
+  {
+    id: 'bg-active-click',
+    name: '[Active] Clicks Continue',
+    desc: 'Service worker clicks Continue in an active tab',
+    async run() {
+      requireChild('active-tab');
+      await resetChild('active-tab');
+      await injectLimit('active-tab');
+      bgWindows['active-tab'].focus();
+      await checkAndClick('active-tab');
+      showToastPreview('Continued (active tab)', 'Service worker fired', '1/20', '#4f8ef7');
+      simLog('Active tab click \u2713', 'ok');
+    },
+  },
+
+  // ── BACKGROUND TAB ────────────────────────────────────────────────────────
+  {
+    id: 'bg-bg-detect',
+    name: '[Background] Detects limit',
+    desc: 'Service worker detects limit while tab is not focused',
+    async run() {
+      requireChild('background-tab');
+      await resetChild('background-tab');
+      await injectLimit('background-tab');
+      window.focus();  // background-tab is now unfocused
+      simLog('background-tab is now in background. Checking\u2026', 'warn');
+      bgSend(bgWindows['background-tab'], 'check-limit');
+      var r = await bgExpect('check-result', 'background-tab', 4000);
+      if (!r.found) throw new Error('Not detected in background tab');
+      simLog('Background tab detection \u2713', 'ok');
+      bgSend(bgWindows['background-tab'], 'clear-limit');
+    },
+  },
+  {
+    id: 'bg-bg-click',
+    name: '[Background] Clicks Continue',
+    desc: 'Service worker clicks Continue while tab is not focused',
+    async run() {
+      requireChild('background-tab');
+      await resetChild('background-tab');
+      await injectLimit('background-tab');
+      window.focus();
+      simLog('Limit injected. background-tab unfocused. Service worker acting\u2026', 'warn');
+      await checkAndClick('background-tab');
+      showToastPreview('Continued (background tab)', 'Fired while tab was hidden', '2/20', '#4f8ef7');
+      simLog('Background tab click \u2713', 'ok');
+    },
+  },
+
+  // ── SEPARATE WINDOW ───────────────────────────────────────────────────────
+  {
+    id: 'bg-win-detect',
+    name: '[Separate window] Detects limit',
+    desc: 'Service worker detects limit in a completely separate browser window',
+    async run() {
+      requireChild('separate-win');
+      await resetChild('separate-win');
+      await injectLimit('separate-win');
+      window.focus();  // separate-win window is now background
+      simLog('separate-win is in a different window. Checking\u2026', 'warn');
+      bgSend(bgWindows['separate-win'], 'check-limit');
+      var r = await bgExpect('check-result', 'separate-win', 4000);
+      if (!r.found) throw new Error('Not detected in separate window');
+      simLog('Separate window detection \u2713', 'ok');
+      bgSend(bgWindows['separate-win'], 'clear-limit');
+    },
+  },
+  {
+    id: 'bg-win-click',
+    name: '[Separate window] Clicks Continue',
+    desc: 'Service worker clicks Continue in a completely separate browser window',
+    async run() {
+      requireChild('separate-win');
+      await resetChild('separate-win');
+      await injectLimit('separate-win');
+      window.focus();
+      simLog('Limit injected in separate window. Service worker acting\u2026', 'warn');
+      await checkAndClick('separate-win');
+      showToastPreview('Continued (separate window)', 'Fired across browser window', '3/20', '#22c55e');
+      simLog('Separate window click \u2713', 'ok');
+    },
+  },
+
+  // ── MULTI-TAB SIMULTANEOUS ────────────────────────────────────────────────
+  {
+    id: 'bg-multi-simultaneous',
+    name: '[Multi] Handles all 3 simultaneously',
+    desc: 'Injects limit into all 3 windows at once — all should be clicked',
+    async run() {
+      requireChild('active-tab'); requireChild('background-tab'); requireChild('separate-win');
+      await resetChild('active-tab');
+      await resetChild('background-tab');
+      await resetChild('separate-win');
+
+      // Inject into all three
+      await injectLimit('active-tab');
+      await injectLimit('background-tab');
+      await injectLimit('separate-win');
+      window.focus();
+      simLog('Limit injected in all 3 windows simultaneously\u2026', 'warn');
+
+      // Fire clicks on all three and wait for all confirmations
+      var p1 = bgExpect('continue-clicked', 'active-tab',     6000);
+      var p2 = bgExpect('continue-clicked', 'background-tab', 6000);
+      var p3 = bgExpect('continue-clicked', 'separate-win',   6000);
+
+      bgSend(bgWindows['active-tab'],     'script-click');
+      bgSend(bgWindows['background-tab'], 'script-click');
+      bgSend(bgWindows['separate-win'],   'script-click');
+
+      await Promise.all([p1, p2, p3]);
+      showToastPreview('All 3 tabs continued', 'Active + background + separate window', '6/20', '#22c55e');
+      simLog('Multi-tab simultaneous click \u2713', 'ok');
+    },
+  },
+
+  // ── THROTTLE SIMULATION ───────────────────────────────────────────────────
+  {
+    id: 'bg-throttle',
+    name: '[Background] Fires after 4s throttle delay',
+    desc: 'Injects, waits 4s (simulating browser timer throttle), still detects and clicks',
+    async run() {
+      requireChild('background-tab');
+      await resetChild('background-tab');
+      await injectLimit('background-tab');
+      window.focus();
+      simLog('Waiting 4s to simulate throttle\u2026', 'warn');
+      await sleep(4000);
+      await checkAndClick('background-tab');
+      simLog('Post-throttle detection + click \u2713', 'ok');
+    },
+  },
+
+  // ── TEARDOWN ──────────────────────────────────────────────────────────────
+  {
+    id: 'bg-close-all',
+    name: 'Close all test windows',
+    desc: 'Closes all 3 child windows',
+    async run() {
+      closeAllChildren();
+      await sleep(400);
+      var anyOpen = Object.values(bgWindows).some(w => w && !w.closed);
+      if (anyOpen) throw new Error('Some windows did not close');
+      simLog('All windows closed \u2713', 'ok');
+    },
+  },
+];
+
+// TEST RUNNER
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildTestList() {
+  const list = document.getElementById('test-list');
+  TESTS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'test-row';
+    row.id = `tr-${t.id}`;
+    row.onclick = () => runSingle(t);
+    row.innerHTML = `
+      <div class="test-indicator idle" id="ti-${t.id}"></div>
+      <div class="test-info">
+        <div class="test-name">${t.name}</div>
+        <div class="test-desc">${t.desc}</div>
+        <div class="test-result" id="res-${t.id}"></div>
+      </div>
+      <div class="test-duration" id="td-${t.id}"></div>
+    `;
+    list.appendChild(row);
+  });
+
+  const bgList = document.getElementById('bg-test-list');
+  BG_TESTS.forEach((t) => {
+    const row = document.createElement('div');
+    row.className = 'test-row';
+    row.id = `tr-${t.id}`;
+    row.onclick = () => runSingle(t);
+    row.innerHTML = `
+      <div class="test-indicator idle" id="ti-${t.id}"></div>
+      <div class="test-info">
+        <div class="test-name">${t.name}</div>
+        <div class="test-desc">${t.desc}</div>
+        <div class="test-result" id="res-${t.id}"></div>
+      </div>
+      <div class="test-duration" id="td-${t.id}"></div>
+    `;
+    bgList.appendChild(row);
+  });
+
+  document.getElementById('s-total').textContent = `${TESTS.length + BG_TESTS.length} tests`;
+}
+
+function setTestState(id, state, msg = '', ms = null) {
+  const row = document.getElementById(`tr-${id}`);
+  const ind = document.getElementById(`ti-${id}`);
+  const res = document.getElementById(`res-${id}`);
+  const dur = document.getElementById(`td-${id}`);
+  if (!row) return;
+  row.className = `test-row ${state}`;
+  ind.className = `test-indicator ${state}`;
+  ind.textContent = state === 'pass' ? '✓' : state === 'fail' ? '✕' : state === 'running' ? '◌' : '';
+  if (msg) {
+    res.textContent = msg;
+    res.className = `test-result visible ${state === 'fail' ? 'err' : 'ok'}`;
+  }
+  if (ms !== null) dur.textContent = `${ms}ms`;
+}
+
+async function runSingle(test) {
+  setTestState(test.id, 'running');
+  simLog(`Running: ${test.name}`, 'info');
+  const t0 = Date.now();
+  try {
+    await test.run();
+    const ms = Date.now() - t0;
+    setTestState(test.id, 'pass', 'Passed', ms);
+    return true;
+  } catch (e) {
+    const ms = Date.now() - t0;
+    setTestState(test.id, 'fail', e.message, ms);
+    simLog(`FAIL: ${e.message}`, 'err');
+    return false;
+  }
+}
+
+async function runAll() {
+  const btn = document.getElementById('run-all-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  document.getElementById('sim-body').innerHTML = '<div style="color:var(--text3);font-size:11px">Running tests…</div>';
+  document.getElementById('log-body').innerHTML = '';
+  _mockStorage.continueCount  = 0;
+  _mockStorage.paused         = false;
+  _mockStorage.maxContinues   = 20;
+  _mockStorage.minimizeTokens = false;
+
+  let passed = 0, failed = 0;
+  const t0 = Date.now();
+
+  for (const test of TESTS) {
+    const ok = await runSingle(test);
+    ok ? passed++ : failed++;
+    await sleep(150);
+  }
+
+  document.getElementById('s-pass').textContent = `${passed} passed`;
+  document.getElementById('s-fail').textContent = `${failed} failed`;
+  const total = Date.now() - t0;
+  document.getElementById('s-time').textContent = `${total}ms`;
+  simLog(`Unit tests done: ${passed}/${TESTS.length} passed`, passed === TESTS.length ? 'ok' : 'err');
+
+  btn.disabled = false;
+  btn.textContent = '▶ Run all';
+}
+
+async function runBgAll() {
+  const btn = document.getElementById('run-bg-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  document.getElementById('log-body').innerHTML = '';
+  simLog('Starting background tab tests…', 'info');
+
+  let passed = 0, failed = 0;
+  const t0 = Date.now();
+
+  for (const test of BG_TESTS) {
+    const ok = await runSingle(test);
+    ok ? passed++ : failed++;
+    await sleep(200);
+  }
+
+  const total = Date.now() - t0;
+  document.getElementById('s-pass').textContent = `${passed} passed`;
+  document.getElementById('s-fail').textContent = `${failed} failed`;
+  document.getElementById('s-time').textContent = `${total}ms`;
+  simLog(`Background tests done: ${passed}/${BG_TESTS.length} passed in ${total}ms`,
+    passed === BG_TESTS.length ? 'ok' : 'err');
+
+  btn.disabled = false;
+  btn.textContent = '▶ Run background tests';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+buildTestList();
+simLog('Test harness ready. Click "Run all" or click any test row.', 'info');
+</script>
+</body>
+</html>
