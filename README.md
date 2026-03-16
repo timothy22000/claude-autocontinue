@@ -28,12 +28,24 @@ Claude has an undocumented per-turn tool-call cap (around 20 calls). When it is 
 
 ## Install
 
+### Option A: Clone the repository
+
+```bash
+git clone https://github.com/timothy22000/claude-autocontinue.git
+```
+
+Then follow the steps below for your browser using the cloned folder.
+
+### Option B: Download a release
+
+Download and unzip the latest release from the [Releases](https://github.com/timothy22000/claude-autocontinue/releases) page, then follow the steps below.
+
 ### Chrome / Edge (Developer Mode)
 
-1. Download and unzip the latest release from the [Releases](https://github.com/timothy22000/claude-autocontinue/releases) page
-2. Open `chrome://extensions/` (or `edge://extensions/`)
-3. Enable **Developer mode** (top right toggle)
-4. Click **Load unpacked** and select the `extension/` folder
+1. Open `chrome://extensions/` (or `edge://extensions/`)
+2. Enable **Developer mode** (top right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/` folder inside the cloned or unzipped directory
 5. Open or reload claude.ai
 
 ---
