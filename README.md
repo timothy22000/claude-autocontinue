@@ -177,9 +177,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 See [CHANGELOG.md](CHANGELOG.md).
 
----
-
-## License
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
