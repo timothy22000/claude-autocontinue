@@ -6,7 +6,6 @@ A browser extension that automatically resumes Claude when it hits the per-turn 
 ![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-green)
-![Firefox](https://img.shields.io/badge/firefox-MV2-orange)
 
 ---
 
@@ -36,14 +35,6 @@ Claude has an undocumented per-turn tool-call cap (around 20 calls). When it is 
 3. Enable **Developer mode** (top right toggle)
 4. Click **Load unpacked** and select the `extension/` folder
 5. Open or reload claude.ai
-
-### Firefox
-
-1. Open `about:debugging` in Firefox
-2. Click **This Firefox** then **Load Temporary Add-on**
-3. Select any file inside the `extension-firefox/` folder
-
-For a permanent Firefox install, upload the `extension-firefox/` folder to [addons.mozilla.org](https://addons.mozilla.org/developers/) for free signing, then distribute the `.xpi` directly.
 
 ---
 
