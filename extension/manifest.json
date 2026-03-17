@@ -3,6 +3,7 @@
   "name": "Claude Auto-Continue",
   "version": "1.3.0",
   "description": "Auto-resumes Claude when it hits the tool-use limit - works across all tabs and windows, active or background.",
+  "homepage_url": "https://github.com/timothy22000/claude-autocontinue",
   "permissions": [
     "activeTab",
     "scripting",

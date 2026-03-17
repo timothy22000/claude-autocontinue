@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy – Claude Auto-Continue</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #fafafa;
+      padding: 0 20px;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 60px auto 80px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 32px 0 12px;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      font-size: 15px;
+      color: #374151;
+      margin-bottom: 14px;
+    }
+
+    ul {
+      margin: 0 0 14px 24px;
+      font-size: 15px;
+      color: #374151;
+    }
+
+    ul li { margin-bottom: 6px; }
+
+    a { color: #4f8ef7; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="subtitle">Claude Auto-Continue Browser Extension · Last updated March 17, 2026</p>
+
+    <h2>Overview</h2>
+    <p>Claude Auto-Continue is a browser extension that automatically clicks the "Continue" button on claude.ai when Claude reaches its per-turn tool-use limit. This privacy policy explains what data the extension does and does not access.</p>
+
+    <h2>Data Collection</h2>
+    <p>Claude Auto-Continue does <strong>not</strong> collect, transmit, store, or share any personal data, browsing history, or analytics. There are no servers, no tracking, and no third-party services.</p>
+
+    <h2>Local Storage</h2>
+    <p>The extension stores a small number of user preferences locally on your device using Chrome's <code>storage.local</code> API. These include:</p>
+    <ul>
+      <li>Whether the extension is paused or active</li>
+      <li>The maximum continuation limit you have set</li>
+      <li>The current continuation count for the session</li>
+      <li>Whether the "minimize tokens" option is enabled</li>
+    </ul>
+    <p>This data never leaves your browser and is not accessible to any external service.</p>
+
+    <h2>Permissions</h2>
+    <p>The extension requests the following permissions, all scoped exclusively to <code>claude.ai</code>:</p>
+    <ul>
+      <li><strong>scripting</strong> – Inject detection and click scripts into claude.ai tabs</li>
+      <li><strong>tabs</strong> – Query open claude.ai tabs across all windows so the extension works in background tabs</li>
+      <li><strong>storage</strong> – Persist your settings locally across browser sessions</li>
+      <li><strong>alarms</strong> – Keep the background service worker alive so polling continues reliably</li>
+      <li><strong>activeTab</strong> – Allow the popup to communicate with the current tab</li>
+    </ul>
+    <p>The extension's host permissions are limited to <code>https://claude.ai/*</code>. It cannot access any other website.</p>
+
+    <h2>Third-Party Services</h2>
+    <p>The extension does not communicate with any external server. No data is sent to Anthropic, the extension developer, or any third party.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>If this policy is updated, the changes will be posted on this page with a revised date. Significant changes will also be noted in the extension's changelog.</p>
+
+    <h2>Contact</h2>
+    <p>For questions or concerns about this policy, please open an issue on the <a href="https://github.com/timothy22000/claude-autocontinue/issues">GitHub repository</a>.</p>
+
+    <div class="footer">
+      Claude Auto-Continue is an open-source project released under the MIT License.
+    </div>
+  </div>
+</body>
+</html>
