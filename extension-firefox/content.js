@@ -110,20 +110,38 @@ const _api = (typeof browser !== "undefined") ? browser : chrome;
 
   // ── DOM helpers ────────────────────────────────────────────────────────────
 
+  // Visibility: avoid offsetParent and getComputedStyle - both are unreliable
+  // in Firefox background tabs (layout is not computed). Instead just check
+  // the hidden attribute and inline display:none up the tree. The two-signal
+  // requirement (button + phrase in last message) already prevents false
+  // positives, so this only needs to filter out truly hidden DOM nodes.
+  function notHidden(el) {
+    let node = el;
+    while (node && node.nodeType === 1) {
+      if (node.hidden) return false;
+      if (node.style && node.style.display === 'none') return false;
+      node = node.parentElement;
+    }
+    return true;
+  }
+
   function pageContainsLimitMessage() {
-    // Require a visible Continue button as the primary trigger signal.
-    // Do NOT scan all body.innerText: it includes chat history that may merely
+    // Require a Continue button as the primary trigger signal.
+    // Do NOT scan all body text: it includes chat history that may merely
     // mention these phrases (e.g. a conversation about this extension itself).
     const continueBtn = [...document.querySelectorAll('button, [role="button"]')]
       .find(el => {
         const t = (el.innerText || el.textContent || '').trim();
         return (t === 'Continue' || t.startsWith('Continue')) &&
-               el.offsetParent !== null; // visible in DOM
+               notHidden(el);
       });
 
     if (!continueBtn) return false;
 
-    // Confirm phrase is in the last assistant message, not stale history
+    // Search for the limit phrase using multiple strategies, since Claude's
+    // UI structure changes and class-based selectors go stale.
+
+    // Strategy 1: Known message selectors
     const msgSelectors = [
       '[data-testid="assistant-message"]',
       '.font-claude-message',
@@ -131,20 +149,37 @@ const _api = (typeof browser !== "undefined") ? browser : chrome;
       '[class*="assistant-message"]',
     ];
 
-    let searchEl = null;
     for (const sel of msgSelectors) {
       const all = document.querySelectorAll(sel);
       if (all.length) {
-        searchEl = all[all.length - 1];
-        break;
+        const text = (all[all.length - 1].textContent || '').toLowerCase();
+        if (LIMIT_PHRASES.some(p => text.includes(p))) return true;
+        break; // Selector matched elements but phrase not found - keep trying
       }
     }
 
-    const searchText = searchEl
-      ? (searchEl.innerText || searchEl.textContent || '').toLowerCase()
-      : (document.body?.innerText || '').slice(-2000).toLowerCase();
+    // Strategy 2: Walk up from the Continue button
+    let ancestor = continueBtn.parentElement;
+    let depth = 0;
+    while (ancestor && ancestor !== document.body && depth < 15) {
+      const text = (ancestor.textContent || '').toLowerCase();
+      if (text.length > 200 && LIMIT_PHRASES.some(p => text.includes(p))) return true;
+      ancestor = ancestor.parentElement;
+      depth++;
+    }
 
-    return LIMIT_PHRASES.some(p => searchText.includes(p));
+    // Strategy 3: Broad structural containers
+    const containers = document.querySelectorAll(
+      'main, article, [role="main"], [role="log"], [class*="conversation"], [class*="chat"], [class*="message"]'
+    );
+    for (const c of containers) {
+      const text = (c.textContent || '').toLowerCase();
+      if (text.length > 200 && LIMIT_PHRASES.some(p => text.includes(p))) return true;
+    }
+
+    // Strategy 4: Last resort - body text
+    const bodyText = (document.body?.textContent || '').slice(-5000).toLowerCase();
+    return LIMIT_PHRASES.some(p => bodyText.includes(p));
   }
 
   function findContinueButton() {
